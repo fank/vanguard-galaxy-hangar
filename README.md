@@ -49,24 +49,4 @@ This will compile the mod. You will find the output `HangarImprovements.dll` ins
 3.  Place it inside your `Vanguard Galaxy/BepInEx/plugins/` folder.
 4.  Launch the game. The mod will be active.
 
-## How to Publish to GitHub
-
-This project is now in a local git repository. To publish it to GitHub:
-
-1.  **Add all files and commit them:**
-    ```bash
-    git add .
-    git commit -m "Initial commit"
-    ```
-
-2.  **Link to the GitHub repository:**
-    ```bash
-    git remote add origin https://github.com/fank/vanguard-galaxy-hangar.git
-    ```
-
-3.  **Push the code to the main branch:**
-    ```bash
-    git push -u origin main
-    ```
-
 Enjoy your new and improved hangar!
