@@ -152,7 +152,7 @@ namespace HangarImprovements
             var panelRect = panelGo.GetComponent<RectTransform>();
             panelRect.anchorMin = new Vector2(0, 0); panelRect.anchorMax = new Vector2(0, 0);
             panelRect.pivot = new Vector2(0, 0); panelRect.sizeDelta = new Vector2(300, 600);
-            panelRect.anchoredPosition = new Vector2(0, 316);
+            panelRect.anchoredPosition = new Vector2(0, 324);
             panelGo.AddComponent<Image>().color = new Color(0.1f, 0.1f, 0.1f, 0.8f);
             
             var scrollViewGo = CreateScrollView(panelGo.transform);
@@ -177,7 +177,7 @@ namespace HangarImprovements
             colors.highlightedColor = new Color(0.4f, 0.5f, 0.6f, 0.7f);
             itemGo.GetComponent<Button>().colors = colors;
 
-            string nameAndClass = $"<b>{shipData.GetShipName()}</b>\n<size=12>{shipData.shipClass.displayName}</size>";
+            string nameAndClass = $"<b>{shipData.GetShipName()}</b>\n<size=12>{shipData.shipClass.displayName} (Size: {GetShipSize(shipData)})</size>";
             var nameText = CreateText(itemGo.transform, nameAndClass, 14, TextAlignmentOptions.TopLeft);
             var nameRect = nameText.GetComponent<RectTransform>();
             nameRect.anchorMin = new Vector2(0, 0); nameRect.anchorMax = new Vector2(1, 1);
@@ -279,16 +279,14 @@ namespace HangarImprovements
             }
         }
 
-        private static string GetSizeString(SpaceShipType type)
+        private static string GetShipSize(SpaceShipData shipData)
         {
-            switch(type)
+            SpaceShipType shipType = shipData.shipClass.shipRoleType.spaceShipType;
+            if (shipType == SpaceShipType.Drone)
             {
-                case SpaceShipType.Size1: return "Corvette"; case SpaceShipType.Size2: return "Frigate";
-                case SpaceShipType.Size3: return "Destroyer"; case SpaceShipType.Size4: return "Cruiser";
-                case SpaceShipType.Size5: return "Battlecruiser"; case SpaceShipType.Size6: return "Battleship";
-                case SpaceShipType.Size7: return "Dreadnought"; case SpaceShipType.Size8: return "Carrier";
-                case SpaceShipType.Drone: return "Drone"; default: return "Unknown";
+                return "Drone";
             }
+            return ((int)shipType).ToString();
         }
     }
 }
