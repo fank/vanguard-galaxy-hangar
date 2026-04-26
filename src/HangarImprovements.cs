@@ -73,6 +73,14 @@ namespace HangarImprovements
         private RectTransform _contentArea;
         private Sprite _roleIconSprite;
 
+        private RectTransform _filterPanel;
+        private HashSet<SpaceShipRole> _activeRoleFilters = new HashSet<SpaceShipRole>();
+        private Dictionary<SpaceShipRole, GameObject> _roleFilterButtons = new Dictionary<SpaceShipRole, GameObject>();
+        private HashSet<int> _activeSizeFilters = new HashSet<int>();
+        private Dictionary<int, GameObject> _sizeFilterButtons = new Dictionary<int, GameObject>();
+
+        private List<SpaceShipData> _allShips;
+
         void Update()
         {
             if (!gameObject.activeSelf) return;
@@ -85,11 +93,83 @@ namespace HangarImprovements
         public void PopulateShipList(ShipCarousel carousel, List<SpaceShipData> ships)
         {
             _carousel = carousel;
+            _allShips = ships.OrderBy(s => s.GetShipName()).ToList();
             CacheRoleIcon();
             if (_contentArea == null) _contentArea = transform.Find("Scroll View/Viewport/Content").GetComponent<RectTransform>();
-            RedrawShipList(ships.OrderBy(s => s.GetShipName()).ToList());
+            
+            SetupFilterPanel();
+            
+            RedrawShipList();
         }
         
+        private void SetupFilterPanel()
+        {
+            if (_filterPanel == null)
+            {
+                _filterPanel = HangarUIFactory.CreateFilterPanel(transform).GetComponent<RectTransform>();
+            }
+
+            foreach (var btn in _roleFilterButtons.Values) Destroy(btn);
+            _roleFilterButtons.Clear();
+            foreach (var btn in _sizeFilterButtons.Values) Destroy(btn);
+            _sizeFilterButtons.Clear();
+
+            var roles = _allShips.Select(s => s.shipClass.shipRoleType.GetRole()).Distinct().ToList();
+            var sizes = _allShips.Select(s => (int)s.shipClass.shipRoleType.spaceShipType).Where(s => s > 0).Distinct().OrderBy(s => s).ToList();
+
+            _activeRoleFilters = new HashSet<SpaceShipRole>(roles);
+            _activeSizeFilters = new HashSet<int>(sizes);
+            
+            HangarUIFactory.CreateText(_filterPanel, "Roles", 10, TextAlignmentOptions.Center);
+            foreach (var role in roles)
+            {
+                var buttonGo = HangarUIFactory.CreateRoleFilterButton(_filterPanel, role, _roleIconSprite, () => OnFilterButtonClicked(role, null));
+                _roleFilterButtons[role] = buttonGo;
+            }
+
+            HangarUIFactory.CreateText(_filterPanel, "Sizes", 10, TextAlignmentOptions.Center);
+            foreach (var size in sizes)
+            {
+                var buttonGo = HangarUIFactory.CreateFilterButton(_filterPanel, size.ToString(), () => OnFilterButtonClicked(null, size));
+                _sizeFilterButtons[size] = buttonGo;
+            }
+            
+            UpdateFilterButtonColors();
+        }
+
+        private void OnFilterButtonClicked(SpaceShipRole? role, int? size)
+        {
+            if (role.HasValue)
+            {
+                if (_activeRoleFilters.Contains(role.Value)) _activeRoleFilters.Remove(role.Value);
+                else _activeRoleFilters.Add(role.Value);
+            }
+            if (size.HasValue)
+            {
+                if (_activeSizeFilters.Contains(size.Value)) _activeSizeFilters.Remove(size.Value);
+                else _activeSizeFilters.Add(size.Value);
+            }
+            
+            UpdateFilterButtonColors();
+            RedrawShipList();
+        }
+        
+        private void UpdateFilterButtonColors()
+        {
+            foreach (var kvp in _roleFilterButtons)
+            {
+                kvp.Value.GetComponent<Image>().color = _activeRoleFilters.Contains(kvp.Key)
+                    ? new Color(0.3f, 0.4f, 0.5f, 0.7f)
+                    : new Color(0.2f, 0.2f, 0.2f, 0.7f);
+            }
+            foreach (var kvp in _sizeFilterButtons)
+            {
+                kvp.Value.GetComponent<Image>().color = _activeSizeFilters.Contains(kvp.Key)
+                    ? new Color(0.3f, 0.4f, 0.5f, 0.7f)
+                    : new Color(0.2f, 0.2f, 0.2f, 0.7f);
+            }
+        }
+
         private void CacheRoleIcon()
         {
             if (_carousel != null && _roleIconSprite == null)
@@ -103,26 +183,44 @@ namespace HangarImprovements
             }
         }
 
-        private void RedrawShipList(List<SpaceShipData> ships)
+        private void RedrawShipList()
         {
             _shipListItems.ForEach(Destroy);
             _shipListItems.Clear();
-            // ContentSizeFitter will handle height, so we just set min width to parent
-            _contentArea.sizeDelta = new Vector2(0, 0); 
             
-            foreach (var shipData in ships)
+            _contentArea.sizeDelta = new Vector2(0, 0);
+
+            var filteredShips = _allShips
+                .Where(s => _activeRoleFilters.Contains(s.shipClass.shipRoleType.GetRole()) && 
+                            (_activeSizeFilters.Contains((int)s.shipClass.shipRoleType.spaceShipType) || (int)s.shipClass.shipRoleType.spaceShipType == 0)) // include drones
+                .ToList();
+
+            foreach (var shipData in filteredShips)
             {
-                // No yPos needed, layout group handles it
                 GameObject itemGo = HangarUIFactory.CreateShipListItem(_contentArea, shipData, _roleIconSprite);
                 itemGo.GetComponent<Button>().onClick.AddListener(() => OnShipSelected(shipData));
                 _shipListItems.Add(itemGo);
             }
-            OnShipSelected(_carousel.selectedShipData);
+            
+            if(_carousel.selectedShipData != null && filteredShips.All(s => s.guid != _carousel.selectedShipData.guid))
+            {
+                OnShipSelected(filteredShips.FirstOrDefault());
+            }
+            else
+            {
+                OnShipSelected(_carousel.selectedShipData);
+            }
         }
 
         private void OnShipSelected(SpaceShipData selectedShip)
         {
-            if (_carousel == null || selectedShip == null) return;
+            if (_carousel == null) return;
+            if (selectedShip == null && _shipListItems.Any())
+            {
+                 selectedShip = _shipListItems.First().GetComponent<ShipListItemController>().ShipData;
+            }
+            if (selectedShip == null) return;
+            
             int newIndex = _carousel.ships.FindIndex(s => s.guid == selectedShip.guid);
             if (newIndex != -1 && (_carousel.selectedIndex != newIndex || _carousel.selectedShipData.guid != selectedShip.guid))
             {
@@ -145,6 +243,95 @@ namespace HangarImprovements
 
     public static class HangarUIFactory
     {
+        public static GameObject CreateFilterPanel(Transform parent)
+        {
+            var panelGo = new GameObject("FilterPanel", typeof(RectTransform));
+            panelGo.transform.SetParent(parent, false);
+            var panelRect = panelGo.GetComponent<RectTransform>();
+            panelRect.anchorMin = new Vector2(1, 0);
+            panelRect.anchorMax = new Vector2(1, 1);
+            panelRect.pivot = new Vector2(0, 1);
+            panelRect.sizeDelta = new Vector2(60, 0);
+            panelRect.anchoredPosition = new Vector2(5, 0);
+
+            var layoutGroup = panelGo.AddComponent<VerticalLayoutGroup>();
+            layoutGroup.padding = new RectOffset(5, 5, 5, 5);
+            layoutGroup.spacing = 5;
+            layoutGroup.childControlHeight = true;
+            layoutGroup.childControlWidth = true;
+            layoutGroup.childForceExpandHeight = false;
+            layoutGroup.childForceExpandWidth = false;
+
+            return panelGo;
+        }
+
+        public static GameObject CreateRoleFilterButton(Transform parent, SpaceShipRole role, Sprite iconSprite, UnityEngine.Events.UnityAction onClick)
+        {
+            var buttonGo = new GameObject($"FilterButton_{role}", typeof(RectTransform), typeof(Image), typeof(Button), typeof(LayoutElement));
+            buttonGo.transform.SetParent(parent, false);
+
+            var layout = buttonGo.GetComponent<LayoutElement>();
+            layout.preferredHeight = 30f;
+            layout.minHeight = 30f;
+            layout.preferredWidth = 30f;
+            layout.flexibleWidth = 0;
+
+            var buttonImage = buttonGo.GetComponent<Image>();
+            buttonImage.color = new Color(0.2f, 0.2f, 0.2f, 0.8f);
+
+            var button = buttonGo.GetComponent<Button>();
+            button.onClick.AddListener(onClick);
+            var colors = button.colors;
+            colors.highlightedColor = new Color(0.4f, 0.5f, 0.6f, 0.7f);
+            colors.pressedColor = new Color(0.5f, 0.6f, 0.7f, 0.8f);
+            button.colors = colors;
+
+            var iconGo = new GameObject("Icon", typeof(RectTransform), typeof(Image));
+            iconGo.transform.SetParent(buttonGo.transform, false);
+            var iconRect = iconGo.GetComponent<RectTransform>();
+            iconRect.anchorMin = new Vector2(0.5f, 0.5f);
+            iconRect.anchorMax = new Vector2(0.5f, 0.5f);
+            iconRect.pivot = new Vector2(0.5f, 0.5f);
+            iconRect.sizeDelta = new Vector2(15, 15);
+            iconRect.anchoredPosition = Vector2.zero;
+
+            var iconImage = iconGo.GetComponent<Image>();
+            iconImage.sprite = iconSprite;
+            iconImage.color = GetRoleColor(role);
+
+            return buttonGo;
+        }
+
+        public static GameObject CreateFilterButton(Transform parent, string label, UnityEngine.Events.UnityAction onClick)
+        {
+            var buttonGo = new GameObject($"FilterButton_{label}", typeof(RectTransform), typeof(Image), typeof(Button), typeof(LayoutElement));
+            buttonGo.transform.SetParent(parent, false);
+
+            var layout = buttonGo.GetComponent<LayoutElement>();
+            layout.preferredHeight = 30f;
+            layout.minHeight = 30f;
+            layout.preferredWidth = 30f;
+            layout.flexibleWidth = 0;
+
+            var image = buttonGo.GetComponent<Image>();
+            image.color = new Color(0.2f, 0.2f, 0.2f, 0.8f);
+
+            var button = buttonGo.GetComponent<Button>();
+            button.onClick.AddListener(onClick);
+            var colors = button.colors;
+            colors.highlightedColor = new Color(0.4f, 0.5f, 0.6f, 0.7f);
+            colors.pressedColor = new Color(0.5f, 0.6f, 0.7f, 0.8f);
+            button.colors = colors;
+
+            var text = CreateText(buttonGo.transform, label, 10, TextAlignmentOptions.Center);
+            var textRect = text.GetComponent<RectTransform>();
+            textRect.anchorMin = Vector2.zero;
+            textRect.anchorMax = Vector2.one;
+            textRect.sizeDelta = Vector2.zero;
+
+            return buttonGo;
+        }
+
         public static GameObject CreateShipListPanel(Transform parent)
         {
             var panelGo = new GameObject("HangarImprovementsUIPanel", typeof(RectTransform));
@@ -226,9 +413,11 @@ namespace HangarImprovements
             bgImg.color = new Color(0.05f, 0.05f, 0.05f, 0.9f);
             bgImg.raycastTarget = true;
             
-            var viewportGo = new GameObject("Viewport", typeof(RectTransform), typeof(Mask));
+            var viewportGo = new GameObject("Viewport", typeof(RectTransform), typeof(Mask), typeof(Image));
             viewportGo.transform.SetParent(svGo.transform, false);
             viewportGo.GetComponent<Mask>().showMaskGraphic = false;
+            var viewImg = viewportGo.GetComponent<Image>();
+            viewImg.raycastTarget = false;
             var viewRect = viewportGo.GetComponent<RectTransform>();
             viewRect.pivot = new Vector2(0, 1); viewRect.anchorMin = Vector2.zero; viewRect.anchorMax = Vector2.one;
             viewRect.sizeDelta = Vector2.zero;
@@ -256,7 +445,7 @@ namespace HangarImprovements
             return svGo;
         }
 
-        private static GameObject CreateText(Transform parent, string content, int fontSize, TextAlignmentOptions alignment)
+        public static GameObject CreateText(Transform parent, string content, int fontSize, TextAlignmentOptions alignment)
         {
             var textGo = new GameObject("Text", typeof(RectTransform), typeof(TextMeshProUGUI));
             textGo.transform.SetParent(parent, false);
