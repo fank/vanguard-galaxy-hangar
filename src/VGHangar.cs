@@ -19,15 +19,15 @@ using Behaviour.UI.Spacestation;
 using Behaviour.UI.ShipCarousel;
 using UnityEngine.EventSystems;
 
-namespace HangarImprovements
+namespace VGHangar
 {
-    [BepInPlugin("com.yourname.hangarimprovements", "Hangar Improvements", "0.1.0")]
-    public class HangarImprovementsPlugin : BaseUnityPlugin
+    [BepInPlugin("com.yourname.vghangar", "VG Hangar", "0.1.0")]
+    public class VGHangarPlugin : BaseUnityPlugin
     {
         private void Awake()
         {
-            Logger.LogInfo("Hangar Improvements v2.0 (Reverted) loading!");
-            var harmony = new Harmony("com.yourname.hangarimprovements");
+            Logger.LogInfo("VG Hangar loading!");
+            var harmony = new Harmony("com.yourname.vghangar");
             harmony.PatchAll(typeof(HangarPatch));
         }
     }
@@ -50,7 +50,7 @@ namespace HangarImprovements
                 Transform parent = SpaceStationInterior.instance?.transform;
                 if (parent == null) { parent = __instance.transform; }
 
-                Transform existingPanel = parent.Find("HangarImprovementsUIPanel");
+                Transform existingPanel = parent.Find("VGHangarUIPanel");
                 if (existingPanel != null)
                 {
                     existingPanel.gameObject.SetActive(true);
@@ -62,7 +62,7 @@ namespace HangarImprovements
                     panelObject.AddComponent<HangarUIController>().PopulateShipList(carousel, GamePlayer.current.spaceShips);
                 }
             }
-            catch (Exception e) { Debug.LogError($"Hangar Improvements Error: {e}"); }
+            catch (Exception e) { Debug.LogError($"VG Hangar Error: {e}"); }
         }
     }
     
@@ -334,7 +334,7 @@ namespace HangarImprovements
 
         public static GameObject CreateShipListPanel(Transform parent)
         {
-            var panelGo = new GameObject("HangarImprovementsUIPanel", typeof(RectTransform));
+            var panelGo = new GameObject("VGHangarUIPanel", typeof(RectTransform));
             panelGo.transform.SetParent(parent, false);
             var panelRect = panelGo.GetComponent<RectTransform>();
             panelRect.anchorMin = new Vector2(0, 0); panelRect.anchorMax = new Vector2(0, 0);

@@ -2,8 +2,8 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard2.1</TargetFramework>
-    <AssemblyName>HangarImprovements</AssemblyName>
-    <Product>HangarImprovements</Product>
+    <AssemblyName>VGHangar</AssemblyName>
+    <Product>VGHangar</Product>
     <Version>0.1.0</Version>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <LangVersion>latest</LangVersion>
