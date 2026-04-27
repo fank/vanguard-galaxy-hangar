@@ -1,5 +1,6 @@
 using System.Linq;
 using Behaviour.Equipment;
+using HarmonyLib;
 using Source.SpaceShip;
 using TMPro;
 using UnityEngine;
@@ -236,11 +237,21 @@ public static class HangarUIFactory
 
     private static string GetShipSize(SpaceShipData shipData)
     {
-        SpaceShipType shipType = shipData.shipClass.shipRoleType.spaceShipType;
+        SpaceShipType shipType = GetShipType(shipData);
         if (shipType == SpaceShipType.Drone)
         {
             return "Drone";
         }
         return ((int)shipType).ToString();
+    }
+
+    // The publicized stub exposes SpaceShipRoleType.spaceShipType at compile
+    // time, but the runtime DLL keeps the field private — direct access throws
+    // FieldAccessException under Mono. Reach it through Traverse (cached
+    // reflection) so the call site reads cleanly.
+    public static SpaceShipType GetShipType(SpaceShipData shipData)
+    {
+        return Traverse.Create(shipData.shipClass.shipRoleType)
+            .Field<SpaceShipType>("spaceShipType").Value;
     }
 }

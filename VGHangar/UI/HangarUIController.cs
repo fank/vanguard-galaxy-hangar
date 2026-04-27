@@ -48,18 +48,24 @@ public class HangarUIController : MonoBehaviour
 
     private void SetupFilterPanel()
     {
-        if (_filterPanel == null)
+        // Nuke the whole filter panel and rebuild it from scratch. Per-child
+        // DestroyImmediate looked correct on paper but didn't actually clear
+        // duplicates in-game — possibly because Find() also picks up "FilterPanel"
+        // GameObjects from prior controller instances that aren't tracked by
+        // _filterPanel. Destroying the parent guarantees no stale children leak
+        // through, regardless of how many times this runs per frame.
+        var existing = transform.Find("FilterPanel");
+        while (existing != null)
         {
-            _filterPanel = HangarUIFactory.CreateFilterPanel(transform).GetComponent<RectTransform>();
+            DestroyImmediate(existing.gameObject);
+            existing = transform.Find("FilterPanel");
         }
-
-        foreach (var btn in _roleFilterButtons.Values) Destroy(btn);
+        _filterPanel = HangarUIFactory.CreateFilterPanel(transform).GetComponent<RectTransform>();
         _roleFilterButtons.Clear();
-        foreach (var btn in _sizeFilterButtons.Values) Destroy(btn);
         _sizeFilterButtons.Clear();
 
         var roles = _allShips.Select(s => s.shipClass.shipRoleType.GetRole()).Distinct().ToList();
-        var sizes = _allShips.Select(s => (int)s.shipClass.shipRoleType.spaceShipType).Where(s => s > 0).Distinct().OrderBy(s => s).ToList();
+        var sizes = _allShips.Select(s => (int)HangarUIFactory.GetShipType(s)).Where(s => s > 0).Distinct().OrderBy(s => s).ToList();
 
         _activeRoleFilters = new HashSet<SpaceShipRole>(roles);
         _activeSizeFilters = new HashSet<int>(sizes);
@@ -129,14 +135,21 @@ public class HangarUIController : MonoBehaviour
 
     private void RedrawShipList()
     {
-        _shipListItems.ForEach(Destroy);
+        // DestroyImmediate for the same reason as the filter panel rebuild —
+        // PersonalHangar.ShowShips can postfix multiple times in one frame and
+        // deferred Destroy would let stale rows accumulate underneath the new ones.
+        _shipListItems.ForEach(DestroyImmediate);
         _shipListItems.Clear();
 
         _contentArea.sizeDelta = new Vector2(0, 0);
 
         var filteredShips = _allShips
-            .Where(s => _activeRoleFilters.Contains(s.shipClass.shipRoleType.GetRole()) &&
-                        (_activeSizeFilters.Contains((int)s.shipClass.shipRoleType.spaceShipType) || (int)s.shipClass.shipRoleType.spaceShipType == 0)) // include drones
+            .Where(s =>
+            {
+                int shipType = (int)HangarUIFactory.GetShipType(s);
+                return _activeRoleFilters.Contains(s.shipClass.shipRoleType.GetRole()) &&
+                       (_activeSizeFilters.Contains(shipType) || shipType == 0); // include drones
+            })
             .ToList();
 
         foreach (var shipData in filteredShips)
