@@ -44,3 +44,24 @@ public static class HangarUIPatches
         catch (Exception e) { Plugin.Log.LogError($"VGHangar: {e}"); }
     }
 }
+
+// As of game 0.8.1.4, ShipCarousel.ShowShip re-enables the prev/next arrows
+// whenever the player owns more than one ship — and SetPlayerShips queues a
+// DelayedShowShip coroutine that calls ShowShip one frame after our ShowShips
+// postfix runs. So a one-shot hide no longer sticks; re-hide the arrows after
+// every ShowShip, but only for the carousel our list panel is driving (the
+// Shipyard shares this class and must keep its own arrows).
+[HarmonyPatch(typeof(ShipCarousel), nameof(ShipCarousel.ShowShip))]
+public static class ShipCarouselShowShipPatch
+{
+    public static void Postfix(ShipCarousel __instance)
+    {
+        try
+        {
+            if (__instance != HangarUIController.ActiveCarousel) return;
+            Traverse.Create(__instance).Field<Button>("previousButton").Value?.gameObject.SetActive(false);
+            Traverse.Create(__instance).Field<Button>("nextButton").Value?.gameObject.SetActive(false);
+        }
+        catch (Exception e) { Plugin.Log.LogError($"VGHangar ShowShip postfix: {e}"); }
+    }
+}
