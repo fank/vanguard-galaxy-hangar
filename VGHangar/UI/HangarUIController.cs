@@ -13,6 +13,12 @@ namespace VGHangar.UI;
 public class HangarUIController : MonoBehaviour
 {
     private ShipCarousel _carousel = null!;
+
+    // The carousel this panel currently drives. ShipCarouselShowShipPatch reads
+    // this to keep the native prev/next arrows hidden for THIS carousel only —
+    // the Shipyard shares the ShipCarousel class and must keep its own arrows.
+    internal static ShipCarousel? ActiveCarousel;
+
     private List<GameObject> _shipListItems = new();
     private RectTransform _contentArea = null!;
     private Sprite? _roleIconSprite;
@@ -34,9 +40,17 @@ public class HangarUIController : MonoBehaviour
         }
     }
 
+    void OnDisable()
+    {
+        // Stop suppressing the carousel arrows once our panel is gone, so other
+        // screens that reuse a ShipCarousel (e.g. the Shipyard) keep their arrows.
+        if (ActiveCarousel == _carousel) ActiveCarousel = null;
+    }
+
     public void PopulateShipList(ShipCarousel carousel, List<SpaceShipData> ships)
     {
         _carousel = carousel;
+        ActiveCarousel = carousel;
         _allShips = ships.OrderBy(s => s.GetShipName()).ToList();
         CacheRoleIcon();
         if (_contentArea == null) _contentArea = transform.Find("Scroll View/Viewport/Content").GetComponent<RectTransform>();
