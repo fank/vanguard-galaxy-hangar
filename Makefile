@@ -7,7 +7,9 @@ BUILDDLL := $(BUILDDIR)/$(DLL)
 
 # WSL path to the game install — adjust if Steam lives elsewhere
 GAME_DIR := /mnt/c/Program Files (x86)/Steam/steamapps/common/Vanguard Galaxy
-PLUGIN_DIR := $(GAME_DIR)/BepInEx/plugins
+# Folder-based deploy (matches the VGEcho standard): each plugin owns a subfolder
+# under BepInEx/plugins/ rather than dropping a loose DLL into the shared root.
+PLUGIN_DIR := $(GAME_DIR)/BepInEx/plugins/VGHangar
 
 # Resolve dotnet — prefer explicit local SDK, fall back to PATH
 DOTNET   ?= $(shell command -v dotnet 2>/dev/null || echo /tmp/dnsdk/dotnet/dotnet)
