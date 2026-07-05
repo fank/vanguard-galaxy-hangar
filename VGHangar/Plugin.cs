@@ -1,5 +1,6 @@
 using System.Linq;
 using BepInEx;
+using BepInEx.Configuration;
 using BepInEx.Logging;
 using HarmonyLib;
 
@@ -18,12 +19,22 @@ public class Plugin : BaseUnityPlugin
     internal static Plugin Instance { get; private set; } = null!;
     internal static ManualLogSource Log { get; private set; } = null!;
 
+    internal ConfigEntry<string> CfgFilterRoles = null!;
+    internal ConfigEntry<string> CfgFilterSizes = null!;
+
     private Harmony _harmony = null!;
 
     private void Awake()
     {
         Instance = this;
         Log = Logger;
+
+        CfgFilterRoles = Config.Bind("Filters", "ActiveRoles", "",
+            "Comma-separated list of active ship role filters (Combat, Mining, Salvaging, Cargo). " +
+            "Empty = all roles shown. Persisted across sessions.");
+        CfgFilterSizes = Config.Bind("Filters", "ActiveSizes", "",
+            "Comma-separated list of active ship size filters (1, 2, 3...). " +
+            "Empty = all sizes shown. Persisted across sessions.");
 
         _harmony = new Harmony(PluginGuid);
         _harmony.PatchAll();

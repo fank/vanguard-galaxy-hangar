@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Behaviour.UI.Main;
@@ -81,8 +82,8 @@ public class HangarUIController : MonoBehaviour
         var roles = _allShips.Select(s => s.shipClass.shipRoleType.GetRole()).Distinct().ToList();
         var sizes = _allShips.Select(s => (int)HangarUIFactory.GetShipType(s)).Where(s => s > 0).Distinct().OrderBy(s => s).ToList();
 
-        _activeRoleFilters = new HashSet<SpaceShipRole>(roles);
-        _activeSizeFilters = new HashSet<int>(sizes);
+        _activeRoleFilters = ParseRoleFilters(roles);
+        _activeSizeFilters = ParseSizeFilters(sizes);
 
         HangarUIFactory.CreateText(_filterPanel, "Roles", 10, TextAlignmentOptions.Center);
         foreach (var role in roles)
@@ -115,7 +116,58 @@ public class HangarUIController : MonoBehaviour
         }
 
         UpdateFilterButtonColors();
+        SaveFilterState();
         RedrawShipList();
+    }
+
+    private HashSet<SpaceShipRole> ParseRoleFilters(List<SpaceShipRole> availableRoles)
+    {
+        string raw = Plugin.Instance.CfgFilterRoles.Value;
+        if (string.IsNullOrWhiteSpace(raw)) return new HashSet<SpaceShipRole>(availableRoles);
+
+        var parsed = new HashSet<SpaceShipRole>();
+        foreach (var token in raw.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (Enum.TryParse<SpaceShipRole>(token.Trim(), true, out var role) && availableRoles.Contains(role))
+                parsed.Add(role);
+        }
+
+        // If nothing parsed (e.g. config was manually mangled), fall back to all
+        return parsed.Count > 0 ? parsed : new HashSet<SpaceShipRole>(availableRoles);
+    }
+
+    private HashSet<int> ParseSizeFilters(List<int> availableSizes)
+    {
+        string raw = Plugin.Instance.CfgFilterSizes.Value;
+        if (string.IsNullOrWhiteSpace(raw)) return new HashSet<int>(availableSizes);
+
+        var parsed = new HashSet<int>();
+        foreach (var token in raw.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (int.TryParse(token.Trim(), out var size) && availableSizes.Contains(size))
+                parsed.Add(size);
+        }
+
+        return parsed.Count > 0 ? parsed : new HashSet<int>(availableSizes);
+    }
+
+    private void SaveFilterState()
+    {
+        // Batch config writes to avoid triggering two sequential disk I/Os
+        // (BepInEx auto-saves on every ConfigEntry.Value change by default).
+        var config = Plugin.Instance.Config;
+        var wasSaving = config.SaveOnConfigSet;
+        config.SaveOnConfigSet = false;
+        try
+        {
+            Plugin.Instance.CfgFilterRoles.Value = string.Join(",", _activeRoleFilters.Select(r => r.ToString()));
+            Plugin.Instance.CfgFilterSizes.Value = string.Join(",", _activeSizeFilters.Select(s => s.ToString()));
+        }
+        finally
+        {
+            config.SaveOnConfigSet = wasSaving;
+        }
+        config.Save();
     }
 
     private void UpdateFilterButtonColors()
