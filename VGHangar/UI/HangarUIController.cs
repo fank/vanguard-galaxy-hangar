@@ -126,7 +126,7 @@ public class HangarUIController : MonoBehaviour
         if (string.IsNullOrWhiteSpace(raw)) return new HashSet<SpaceShipRole>(availableRoles);
 
         var parsed = new HashSet<SpaceShipRole>();
-        foreach (var token in raw.Split(',', StringSplitOptions.RemoveEmptyEntries))
+        foreach (var token in raw.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries))
         {
             if (Enum.TryParse<SpaceShipRole>(token.Trim(), true, out var role) && availableRoles.Contains(role))
                 parsed.Add(role);
@@ -142,7 +142,7 @@ public class HangarUIController : MonoBehaviour
         if (string.IsNullOrWhiteSpace(raw)) return new HashSet<int>(availableSizes);
 
         var parsed = new HashSet<int>();
-        foreach (var token in raw.Split(',', StringSplitOptions.RemoveEmptyEntries))
+        foreach (var token in raw.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries))
         {
             if (int.TryParse(token.Trim(), out var size) && availableSizes.Contains(size))
                 parsed.Add(size);
@@ -153,8 +153,21 @@ public class HangarUIController : MonoBehaviour
 
     private void SaveFilterState()
     {
-        Plugin.Instance.CfgFilterRoles.Value = string.Join(",", _activeRoleFilters.Select(r => r.ToString()));
-        Plugin.Instance.CfgFilterSizes.Value = string.Join(",", _activeSizeFilters.Select(s => s.ToString()));
+        // Batch config writes to avoid triggering two sequential disk I/Os
+        // (BepInEx auto-saves on every ConfigEntry.Value change by default).
+        var config = Plugin.Instance.Config;
+        var wasSaving = config.SaveOnConfigSet;
+        config.SaveOnConfigSet = false;
+        try
+        {
+            Plugin.Instance.CfgFilterRoles.Value = string.Join(",", _activeRoleFilters.Select(r => r.ToString()));
+            Plugin.Instance.CfgFilterSizes.Value = string.Join(",", _activeSizeFilters.Select(s => s.ToString()));
+        }
+        finally
+        {
+            config.SaveOnConfigSet = wasSaving;
+        }
+        config.Save();
     }
 
     private void UpdateFilterButtonColors()
